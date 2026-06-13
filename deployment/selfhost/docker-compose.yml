@@ -65,18 +65,28 @@ services:
       TZ: ${TZ:-Etc/UTC}
     ports:
       - "9696:9696"          # Prowlarr UI — add indexers + the FlareSolverr proxy here
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach FlareSolverr (published on the DaddyLive gluetun) at :8191
     volumes:
       - prowlarr_config:/config
 
+  # FlareSolverr reuses the EXISTING DaddyLive gluetun — set VPN_CONTAINER in .env to that container's
+  # name. FlareSolverr joins its network namespace, so all FlareSolverr traffic exits that one VPN
+  # tunnel (no second connection). REQUIREMENTS on the DaddyLive gluetun:
+  #   • publish 8191:  add  - "8191:8191"  to its ports
+  #   • allow it:      add/append  FIREWALL_INPUT_PORTS=8191  to its environment
+  # Prowlarr then reaches FlareSolverr at http://host.docker.internal:8191 (via the extra_hosts above).
+  # ⚠ NordVPN exits are datacenter IPs, so Cloudflare may still block 1337x; this still helps other CF
+  #   indexers / gives a different IP.  ⚠ Coupled to that gluetun: if it's RECREATED, recreate this too
+  #   (docker compose -f … up -d --force-recreate flaresolverr).
   flaresolverr:
     container_name: comet-flaresolverr
     image: ghcr.io/flaresolverr/flaresolverr:latest
-    restart: unless-stopped
+    network_mode: "container:${VPN_CONTAINER:-gluetun}"   # join the existing DaddyLive gluetun's netns
     environment:
       LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
       TZ: ${TZ:-Etc/UTC}
-    ports:
-      - "8191:8191"          # referenced inside Prowlarr as http://flaresolverr:8191
+    restart: unless-stopped
 
 volumes:
   comet_data:
