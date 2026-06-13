@@ -87,18 +87,24 @@ services:
       OPENVPN_USER: ${NORDVPN_USER}
       OPENVPN_PASSWORD: ${NORDVPN_PASSWORD}
       SERVER_COUNTRIES: ${VPN_COUNTRY:-United States}
+      SERVER_CITIES: ${VPN_CITIES:-}                # optional: pin to less-burned cities (e.g. "Buffalo,Phoenix"); blank = any in country
       BLOCK_MALICIOUS: "off"                        # default-on DNS filter blackholes domains (DaddyLive lesson)
       FIREWALL_INPUT_PORTS: "8191"                  # allow Prowlarr to reach FlareSolverr through gluetun
       FIREWALL_OUTBOUND_SUBNETS: "172.28.0.0/16"    # must match the compose network subnet below (LAN replies)
       TZ: ${TZ:-Etc/UTC}
     restart: unless-stopped
 
+  # Solver. Byparr is a FlareSolverr-API-compatible drop-in that drives a REAL anti-detect browser
+  # (nodriver/SeleniumBase) instead of plain headless Chrome — much better against modern Cloudflare.
+  # Still listens on :8191, so Prowlarr's "FlareSolverr" proxy (http://gluetun:8191) needs no change.
+  # Heavier than FlareSolverr (real Chromium) — shm_size avoids browser crashes.
   flaresolverr:
     container_name: comet-flaresolverr
-    image: ghcr.io/flaresolverr/flaresolverr:latest
+    image: ghcr.io/thephaseless/byparr:latest
     network_mode: "service:gluetun"   # share gluetun's netns → egress via VPN; Prowlarr reaches it at http://gluetun:8191
+    shm_size: "2gb"
     environment:
-      LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
+      PORT: "8191"
       TZ: ${TZ:-Etc/UTC}
     depends_on:
       - gluetun
