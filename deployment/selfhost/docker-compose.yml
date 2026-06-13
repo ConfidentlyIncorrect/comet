@@ -38,16 +38,16 @@ services:
 
   postgres:
     container_name: comet-postgres
-    image: postgres:18-alpine
+    # Pinned to 17: PG18 images moved to a versioned, pg_ctlcluster-style data layout that fights a
+    # plain volume mount. 17 uses the classic PGDATA at /var/lib/postgresql/data — no drama.
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: comet
       POSTGRES_PASSWORD: comet
       POSTGRES_DB: comet
     volumes:
-      # PG18 stores its cluster under a versioned subdir, so mount the volume at the PARENT
-      # (mounting /var/lib/postgresql/data breaks persistence on PG18).
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U comet -d comet"]
       interval: 5s
