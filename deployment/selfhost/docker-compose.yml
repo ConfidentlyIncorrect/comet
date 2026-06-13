@@ -45,12 +45,15 @@ services:
       POSTGRES_PASSWORD: comet
       POSTGRES_DB: comet
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # PG18 stores its cluster under a versioned subdir, so mount the volume at the PARENT
+      # (mounting /var/lib/postgresql/data breaks persistence on PG18).
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U comet -d comet"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 40s   # give first-boot initdb time before counting failures
 
   prowlarr:
     container_name: comet-prowlarr
