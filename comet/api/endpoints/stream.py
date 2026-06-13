@@ -167,9 +167,14 @@ def _episode_matching_policy(
         and search_episode is not None
         and media_only_id.startswith("tt")
     )
+    # Fork change: upstream only keeps season packs for an episode request when cached-only is on
+    # (so it can debrid-VERIFY the pack contains the episode). That hides every uncached pack the
+    # debrid could still download — which kills shows whose only torrents are season packs (e.g. the
+    # Air.Disasters.S01 AMZN packs). We relax it: on any debrid episode request (not raw-torrent),
+    # allow season packs regardless of cached-only. Uncached ones show as downloadable; the existing
+    # file-selector picks the SxxExx file once the pack is on the debrid.
     allow_debrid_verified_season_packs = (
         is_imdb_episode_request
-        and cached_only
         and has_debrid
         and not enable_torrent
     )
