@@ -65,30 +65,53 @@ services:
       TZ: ${TZ:-Etc/UTC}
     ports:
       - "9696:9696"          # Prowlarr UI — add indexers + the FlareSolverr proxy here
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # reach FlareSolverr (published on the DaddyLive gluetun) at :8191
     volumes:
       - prowlarr_config:/config
 
-  # FlareSolverr reuses the EXISTING DaddyLive gluetun — set VPN_CONTAINER in .env to that container's
-  # name. FlareSolverr joins its network namespace, so all FlareSolverr traffic exits that one VPN
-  # tunnel (no second connection). REQUIREMENTS on the DaddyLive gluetun:
-  #   • publish 8191:  add  - "8191:8191"  to its ports
-  #   • allow it:      add/append  FIREWALL_INPUT_PORTS=8191  to its environment
-  # Prowlarr then reaches FlareSolverr at http://host.docker.internal:8191 (via the extra_hosts above).
-  # ⚠ NordVPN exits are datacenter IPs, so Cloudflare may still block 1337x; this still helps other CF
-  #   indexers / gives a different IP.  ⚠ Coupled to that gluetun: if it's RECREATED, recreate this too
-  #   (docker compose -f … up -d --force-recreate flaresolverr).
+  # Dedicated VPN sidecar for FlareSolverr (self-contained — does not touch the DaddyLive stack).
+  # FlareSolverr joins this container's network namespace, so ALL its traffic exits the VPN instead of
+  # the VPS's datacenter IP — the attempt to get past Cloudflare on 1337x. Uses your NordVPN *service*
+  # credentials (same kind as DaddyLive). NordVPN allows up to 10 connections, so this 2nd tunnel is fine.
+  # ⚠ NordVPN exits are themselves datacenter IPs, which Cloudflare often still blocks — this may not
+  #   beat 1337x. The only reliable bypass is a residential/mobile IP. It still helps other CF indexers.
+  gluetun:
+    container_name: comet-gluetun
+    image: qmcgaw/gluetun:latest
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: nordvpn
+      VPN_TYPE: openvpn
+      OPENVPN_USER: ${NORDVPN_USER}
+      OPENVPN_PASSWORD: ${NORDVPN_PASSWORD}
+      SERVER_COUNTRIES: ${VPN_COUNTRY:-United States}
+      BLOCK_MALICIOUS: "off"                        # default-on DNS filter blackholes domains (DaddyLive lesson)
+      FIREWALL_INPUT_PORTS: "8191"                  # allow Prowlarr to reach FlareSolverr through gluetun
+      FIREWALL_OUTBOUND_SUBNETS: "172.28.0.0/16"    # must match the compose network subnet below (LAN replies)
+      TZ: ${TZ:-Etc/UTC}
+    restart: unless-stopped
+
   flaresolverr:
     container_name: comet-flaresolverr
     image: ghcr.io/flaresolverr/flaresolverr:latest
-    network_mode: "container:${VPN_CONTAINER:-gluetun}"   # join the existing DaddyLive gluetun's netns
+    network_mode: "service:gluetun"   # share gluetun's netns → egress via VPN; Prowlarr reaches it at http://gluetun:8191
     environment:
       LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
       TZ: ${TZ:-Etc/UTC}
+    depends_on:
+      - gluetun
     restart: unless-stopped
 
 volumes:
   comet_data:
   postgres_data:
   prowlarr_config:
+
+# Fixed subnet so gluetun's FIREWALL_OUTBOUND_SUBNETS can whitelist the LAN deterministically.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
