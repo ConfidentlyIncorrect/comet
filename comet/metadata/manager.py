@@ -14,6 +14,7 @@ from comet.utils.parsing import parse_media_id
 from .imdb import get_imdb_metadata
 from .kitsu import get_kitsu_metadata
 from .trakt import get_trakt_aliases
+from .tvdb_dupe import get_tvdb_dupe_metadata
 
 _CACHE_SELECT_QUERY = """
     SELECT title, year, year_end, aliases_json
@@ -131,12 +132,52 @@ class MetadataScraper:
             self.get_metadata(id, season, episode, is_kitsu, media_type)
         )
         aliases_task = asyncio.create_task(self.get_aliases(media_type, id, provider))
+        # Run the #DUPE# probe in parallel so it adds no serial latency.
+        dupe_task = (
+            asyncio.create_task(get_tvdb_dupe_metadata(self.session, id))
+            if provider == "imdb" and media_type in ("series", "tv")
+            else None
+        )
         metadata, aliases = await asyncio.gather(metadata_task, aliases_task)
+
+        # Cinemeta "#DUPE#" fix: id-based metadata resolves a de-duplicated regional entry to the
+        # WRONG (canonical) title — e.g. tt2091498 -> "Mayday" instead of "Air Disasters" — so the
+        # scraper searches the wrong show. Override the title with the real one from TheTVDB and keep
+        # the canonical title + TheTVDB aliases as extra search terms. Generic: handles any dupe.
+        if dupe_task is not None:
+            dupe = await dupe_task
+            if dupe is not None:
+                dupe_title, dupe_aliases, dupe_year = dupe
+                extra_titles = list(dupe_aliases)
+                if metadata is not None and metadata.get("title"):
+                    extra_titles.append(metadata["title"])
+                    metadata = {**metadata, "title": dupe_title}
+                    if dupe_year:
+                        metadata["year"] = dupe_year
+                else:
+                    metadata = {
+                        "title": dupe_title,
+                        "year": dupe_year,
+                        "year_end": None,
+                        "season": season,
+                        "episode": episode,
+                    }
+                aliases = self._merge_aliases(aliases, extra_titles)
 
         if metadata is not None:
             aliases = await self.cache_metadata(cache_id, metadata, aliases)
 
         return metadata, aliases
+
+    @staticmethod
+    def _merge_aliases(existing: dict | None, extra_titles: list[str]) -> dict:
+        """Add extra search titles (canonical + TheTVDB aliases) into the alias dict's 'ez' bucket."""
+        merged = {k: list(v) for k, v in (existing or {}).items()}
+        bucket = merged.setdefault("ez", [])
+        for title in extra_titles:
+            if title and title not in bucket:
+                bucket.append(title)
+        return merged
 
     @staticmethod
     def _extract_provider(media_id: str):

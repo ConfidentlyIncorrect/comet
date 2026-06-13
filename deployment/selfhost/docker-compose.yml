@@ -1,0 +1,81 @@
+# Self-hosted Comet stack (patched fork) — name-search torrent addon for Stremio/Nuvio.
+#
+#   Comet  → Prowlarr → indexers (1337x etc. via FlareSolverr for Cloudflare)
+#          → Postgres (its DB)
+#
+# Comet is BUILT FROM THIS REPO (../..) so our TheTVDB "#DUPE#" metadata patch is baked in
+# (comet/metadata/tvdb_dupe.py + manager.py). Debrid keys (AllDebrid / TorBox) are entered per-user
+# in Comet's config page — NOT here.
+#
+# Bring up:  docker compose -f deployment/selfhost/docker-compose.yml --env-file deployment/selfhost/.env up -d --build
+# See SELF-HOST.md for the one-time Prowlarr setup.
+
+services:
+  comet:
+    container_name: comet
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"          # Nuvio installs from http://<vps>:8000/<config>/manifest.json
+    env_file:
+      - .env
+    environment:
+      DATABASE_TYPE: postgresql
+      DATABASE_URL: comet:comet@postgres:5432/comet
+      # Use Prowlarr as the indexer manager (set the API key in .env after first Prowlarr boot).
+      INDEXER_MANAGER_TYPE: prowlarr
+      INDEXER_MANAGER_URL: http://prowlarr:9696
+      INDEXER_MANAGER_API_KEY: ${PROWLARR_API_KEY}
+    volumes:
+      - comet_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prowlarr:
+        condition: service_started
+
+  postgres:
+    container_name: comet-postgres
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: comet
+      POSTGRES_PASSWORD: comet
+      POSTGRES_DB: comet
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comet -d comet"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  prowlarr:
+    container_name: comet-prowlarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      - "9696:9696"          # Prowlarr UI — add indexers + the FlareSolverr proxy here
+    volumes:
+      - prowlarr_config:/config
+
+  flaresolverr:
+    container_name: comet-flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: ${FLARESOLVERR_LOG_LEVEL:-info}
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      - "8191:8191"          # referenced inside Prowlarr as http://flaresolverr:8191
+
+volumes:
+  comet_data:
+  postgres_data:
+  prowlarr_config:
