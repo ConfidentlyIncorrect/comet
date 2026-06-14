@@ -49,11 +49,13 @@ search:
   paths:
     - path: "v1"
       method: post
+      # Content-Type MUST be inside the path block — at search level Cardigann ignores it and POSTs
+      # form-encoded, which Knaben rejects with HTTP 415 Unsupported Media Type.
+      headers:
+        Content-Type:
+          - "application/json"
       response:
         type: json
-  headers:
-    Content-Type:
-      - "application/json"
   inputs:
     # Raw JSON request body. {{ .Keywords }} is filled by Prowlarr with the (season/episode-aware)
     # search string. order by seeders so the best-seeded releases come first.
