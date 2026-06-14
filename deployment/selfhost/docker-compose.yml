@@ -68,56 +68,25 @@ services:
     volumes:
       - prowlarr_config:/config
 
-  # Dedicated VPN sidecar for FlareSolverr (self-contained — does not touch the DaddyLive stack).
-  # FlareSolverr joins this container's network namespace, so ALL its traffic exits the VPN instead of
-  # the VPS's datacenter IP — the attempt to get past Cloudflare on 1337x. Uses your NordVPN *service*
-  # credentials (same kind as DaddyLive). NordVPN allows up to 10 connections, so this 2nd tunnel is fine.
-  # ⚠ NordVPN exits are themselves datacenter IPs, which Cloudflare often still blocks — this may not
-  #   beat 1337x. The only reliable bypass is a residential/mobile IP. It still helps other CF indexers.
-  gluetun:
-    container_name: comet-gluetun
-    image: qmcgaw/gluetun:latest
-    cap_add:
-      - NET_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    environment:
-      VPN_SERVICE_PROVIDER: nordvpn
-      VPN_TYPE: openvpn
-      OPENVPN_USER: ${NORDVPN_USER}
-      OPENVPN_PASSWORD: ${NORDVPN_PASSWORD}
-      SERVER_COUNTRIES: ${VPN_COUNTRY:-United States}
-      SERVER_CITIES: ${VPN_CITIES:-}                # optional: pin to less-burned cities (e.g. "Buffalo,Phoenix"); blank = any in country
-      BLOCK_MALICIOUS: "off"                        # default-on DNS filter blackholes domains (DaddyLive lesson)
-      FIREWALL_INPUT_PORTS: "8191"                  # allow Prowlarr to reach FlareSolverr through gluetun
-      FIREWALL_OUTBOUND_SUBNETS: "172.28.0.0/16"    # must match the compose network subnet below (LAN replies)
-      TZ: ${TZ:-Etc/UTC}
-    restart: unless-stopped
-
-  # Solver. Byparr is a FlareSolverr-API-compatible drop-in that drives a REAL anti-detect browser
-  # (nodriver/SeleniumBase) instead of plain headless Chrome — much better against modern Cloudflare.
-  # Still listens on :8191, so Prowlarr's "FlareSolverr" proxy (http://gluetun:8191) needs no change.
-  # Heavier than FlareSolverr (real Chromium) — shm_size avoids browser crashes.
+  # Solver — Byparr (FlareSolverr-API-compatible) driving a REAL anti-detect browser
+  # (nodriver/SeleniumBase) instead of plain headless Chrome, so it clears modern Cloudflare/Turnstile.
+  # Runs DIRECTLY on the VPS IP (no VPN): a VPN exit makes Cloudflare serve a harder challenge AND
+  # binds the cf_clearance cookie to a different IP than Prowlarr uses — both break the solve. The
+  # VPS's own IP only gets the normal check, which Byparr clears. (Only the actual torrent download
+  # goes through your debrid, never the VPS, so no VPN is needed here.) Prowlarr reaches it at
+  # http://flaresolverr:8191. shm_size avoids Chromium crashes.
   flaresolverr:
     container_name: comet-flaresolverr
     image: ghcr.io/thephaseless/byparr:latest
-    network_mode: "service:gluetun"   # share gluetun's netns → egress via VPN; Prowlarr reaches it at http://gluetun:8191
+    restart: unless-stopped
     shm_size: "2gb"
+    ports:
+      - "8191:8191"
     environment:
       PORT: "8191"
       TZ: ${TZ:-Etc/UTC}
-    depends_on:
-      - gluetun
-    restart: unless-stopped
 
 volumes:
   comet_data:
   postgres_data:
   prowlarr_config:
-
-# Fixed subnet so gluetun's FIREWALL_OUTBOUND_SUBNETS can whitelist the LAN deterministically.
-networks:
-  default:
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
