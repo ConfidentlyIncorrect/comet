@@ -121,6 +121,11 @@ class AppSettings(BaseSettings):
     PROWLARR_API_KEY: Optional[str] = None
     PROWLARR_INDEXERS: List[str] = []
     GET_TORRENT_TIMEOUT: Optional[int] = 5
+    # Max concurrent torrent-file downloads from the indexer manager. Cloudflare indexers (1337x etc.)
+    # resolve each .torrent through FlareSolverr/Byparr's single browser, so firing all results at
+    # once makes them share one GET_TORRENT_TIMEOUT window and nearly all time out. A small limit
+    # lets each batch use its full timeout, so far more survive. 0 = unlimited (upstream default).
+    GET_TORRENT_CONCURRENCY: Optional[int] = 0
     MAGNET_RESOLVE_TIMEOUT: Optional[int] = 60
     CATALOG_TIMEOUT: Optional[int] = 30
     DOWNLOAD_TORRENT_FILES: Optional[bool] = False

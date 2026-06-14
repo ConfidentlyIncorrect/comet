@@ -393,6 +393,10 @@ def log_startup_info(settings):
         f"Indexer Manager Update Interval: {settings.INDEXER_MANAGER_UPDATE_INTERVAL}s",
     )
     logger.log("COMET", f"Get Torrent Timeout: {settings.GET_TORRENT_TIMEOUT}s")
+    logger.log(
+        "COMET",
+        f"Get Torrent Concurrency: {settings.GET_TORRENT_CONCURRENCY or 'unlimited'}",
+    )
     logger.log("COMET", f"Magnet Resolve Timeout: {settings.MAGNET_RESOLVE_TIMEOUT}s")
     logger.log("COMET", f"Catalog Timeout: {settings.CATALOG_TIMEOUT}s")
     logger.log("COMET", f"Scrape Lock TTL: {settings.SCRAPE_LOCK_TTL}s")

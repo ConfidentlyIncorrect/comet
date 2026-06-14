@@ -297,7 +297,27 @@ def _construct_torrent_metadata(
     )
 
 
-async def download_torrent(session, url: str):
+_DOWNLOAD_SEMAPHORE: asyncio.Semaphore | None = None
+
+
+def _download_semaphore() -> asyncio.Semaphore | None:
+    """Bound how many torrent-file downloads run at once.
+
+    Cloudflare indexers resolve each .torrent through FlareSolverr/Byparr's single browser. Firing
+    every result in parallel makes them all share one GET_TORRENT_TIMEOUT window, so the browser only
+    clears a few and the rest time out together. Limiting concurrency lets each batch use its full
+    timeout — far more downloads survive. Created lazily inside the running loop. 0 = unlimited.
+    """
+    global _DOWNLOAD_SEMAPHORE
+    limit = settings.GET_TORRENT_CONCURRENCY or 0
+    if limit <= 0:
+        return None
+    if _DOWNLOAD_SEMAPHORE is None:
+        _DOWNLOAD_SEMAPHORE = asyncio.Semaphore(limit)
+    return _DOWNLOAD_SEMAPHORE
+
+
+async def _download_torrent_inner(session, url: str):
     try:
         async with session.get(
             url, allow_redirects=False, timeout=TORRENT_TIMEOUT
@@ -316,6 +336,14 @@ async def download_torrent(session, url: str):
             f"Failed to download torrent from {url}: {e} (in most cases, you can ignore this error)"
         )
         return (None, None, None)
+
+
+async def download_torrent(session, url: str):
+    semaphore = _download_semaphore()
+    if semaphore is None:
+        return await _download_torrent_inner(session, url)
+    async with semaphore:
+        return await _download_torrent_inner(session, url)
 
 
 demagnetizer = Demagnetizer()
