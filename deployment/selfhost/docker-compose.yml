@@ -28,6 +28,9 @@ services:
       INDEXER_MANAGER_TYPE: prowlarr
       INDEXER_MANAGER_URL: http://prowlarr:9696
       INDEXER_MANAGER_API_KEY: ${PROWLARR_API_KEY}
+      # Re-scrape every request (Prowlarr + all scrapers) and merge new torrents onto the cache,
+      # instead of serving a "fresh" cache without scraping. Costs a few seconds per open.
+      ALWAYS_RESCRAPE: ${ALWAYS_RESCRAPE:-True}
     volumes:
       - comet_data:/app/data
     depends_on:

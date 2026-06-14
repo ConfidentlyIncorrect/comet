@@ -397,6 +397,7 @@ def log_startup_info(settings):
     logger.log("COMET", f"Catalog Timeout: {settings.CATALOG_TIMEOUT}s")
     logger.log("COMET", f"Scrape Lock TTL: {settings.SCRAPE_LOCK_TTL}s")
     logger.log("COMET", f"Scrape Wait Timeout: {settings.SCRAPE_WAIT_TIMEOUT}s")
+    logger.log("COMET", f"Always Rescrape: {settings.ALWAYS_RESCRAPE}")
     logger.log("COMET", f"Download Torrent Files: {settings.DOWNLOAD_TORRENT_FILES}")
 
     comet_url = (

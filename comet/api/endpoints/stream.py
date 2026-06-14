@@ -655,7 +655,10 @@ async def stream(
         cache_media_ids=cache_media_ids,
     )
     cache_result = await cache_manager.check_and_decide(torrent_count)
-    force_scrape_now = not primary_cached
+    # ALWAYS_RESCRAPE: never serve a "fresh" cache without also scraping. The cached torrents
+    # are already loaded into torrent_manager.torrents, and scrape_torrents() merges new finds
+    # on top (deduped by info_hash), so the response is cached + freshly-scraped every time.
+    force_scrape_now = settings.ALWAYS_RESCRAPE or not primary_cached
     lock_acquired = cache_result.lock_acquired
 
     sort_mixed = is_torrent_only or config["sortCachedUncachedTogether"]

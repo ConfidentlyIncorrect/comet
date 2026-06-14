@@ -93,6 +93,11 @@ class AppSettings(BaseSettings):
     SCRAPE_WAIT_TIMEOUT: Optional[int] = (
         30  # Max time to wait for other instance to complete
     )
+    # When True, every stream request does a fresh foreground scrape (Prowlarr + all
+    # scrapers) and merges the new torrents onto whatever is already cached, instead of
+    # short-circuiting on a "fresh" cache. Trades a few seconds of latency per open for
+    # always-complete, always-up-to-date results.
+    ALWAYS_RESCRAPE: Optional[bool] = False
     INDEXER_MANAGER_TYPE: Optional[str] = None
     INDEXER_MANAGER_URL: Optional[str] = "http://127.0.0.1:9117"
     INDEXER_MANAGER_API_KEY: Optional[str] = None
