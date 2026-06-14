@@ -438,6 +438,7 @@ async def stream(
     chilllink: bool = False,
     kodi: bool = False,
     poll: bool = False,
+    scope: str = "episode",
 ):
     if media_type not in ["movie", "series"]:
         return _build_stream_response(request, {"streams": []}, is_empty=True)
@@ -579,6 +580,20 @@ async def stream(
                         "SCRAPER",
                         f"📺 Multi-part anime detected (kitsu:{id}): searching for S{search_season:02d} instead of S{season:02d}",
                     )
+
+    # Season/series scope (Nuvio "Search Season" / "Search Whole Series" buttons send ?scope=).
+    # Nulling the episode (and season) makes is_imdb_episode_request False below, which disables the
+    # single-episode reject; match_parsed_episode_target + the cache query then return pack-level
+    # results — season packs for "season", season/series packs for "series". Bypasses the per-episode
+    # renumbering filter that otherwise hides most of a #DUPE# series' torrents.
+    if media_type == "series":
+        if scope == "series":
+            search_season = None
+            search_episode = None
+            logger.log("SCRAPER", f"🗂️  Whole-series scope for {log_title}")
+        elif scope == "season":
+            search_episode = None
+            logger.log("SCRAPER", f"🗂️  Whole-season scope (S{season}) for {log_title}")
 
     cache_media_ids = [media_only_id]
     if anime_mapper.is_loaded():
