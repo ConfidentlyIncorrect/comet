@@ -655,10 +655,23 @@ async def stream(
         cache_media_ids=cache_media_ids,
     )
     cache_result = await cache_manager.check_and_decide(torrent_count)
-    # ALWAYS_RESCRAPE: never serve a "fresh" cache without also scraping. The cached torrents
-    # are already loaded into torrent_manager.torrents, and scrape_torrents() merges new finds
-    # on top (deduped by info_hash), so the response is cached + freshly-scraped every time.
-    force_scrape_now = settings.ALWAYS_RESCRAPE or not primary_cached
+    # ALWAYS_RESCRAPE: never serve a cache without also scraping. The cached torrents are already
+    # loaded into torrent_manager.torrents, and scrape_torrents() merges new finds on top (deduped
+    # by info_hash). Two modes (see settings):
+    #   • background: return the cache instantly and refresh behind the request — fast opens, new
+    #     results land in the cache for next time. Best when some scrapers are slow (Cloudflare via
+    #     Byparr), since the open never waits on the solve.
+    #   • foreground: block until the scrape finishes so cached + fresh are in the SAME response.
+    # An empty cache always scrapes in the foreground (nothing to show otherwise).
+    rescrape_in_background = (
+        settings.ALWAYS_RESCRAPE
+        and settings.ALWAYS_RESCRAPE_BACKGROUND
+        and torrent_count > 0
+    )
+    if rescrape_in_background:
+        force_scrape_now = False
+    else:
+        force_scrape_now = settings.ALWAYS_RESCRAPE or not primary_cached
     lock_acquired = cache_result.lock_acquired
 
     sort_mixed = is_torrent_only or config["sortCachedUncachedTogether"]
@@ -702,7 +715,9 @@ async def stream(
             }
         )
 
-    if cache_result.should_scrape_background and not force_scrape_now:
+    if (
+        cache_result.should_scrape_background or rescrape_in_background
+    ) and not force_scrape_now:
         logger.log(
             "SCRAPER",
             f"🔄 Starting background scrape for {log_title} (state={cache_result.state.value})",
