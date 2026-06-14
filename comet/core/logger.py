@@ -468,6 +468,16 @@ def log_startup_info(settings):
         f"Zilean Scraper: {settings.format_scraper_mode(settings.SCRAPE_ZILEAN)}{zilean_url}",
     )
 
+    therarbg_url = (
+        f" - {settings.THERARBG_URL}"
+        if settings.is_any_context_enabled(settings.SCRAPE_THERARBG)
+        else ""
+    )
+    logger.log(
+        "COMET",
+        f"TheRARBG Scraper: {settings.format_scraper_mode(settings.SCRAPE_THERARBG)}{therarbg_url}",
+    )
+
     stremthru_scrape_url = (
         f" - {settings.STREMTHRU_SCRAPE_URL}"
         if settings.is_any_context_enabled(settings.SCRAPE_STREMTHRU)

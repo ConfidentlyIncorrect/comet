@@ -144,6 +144,10 @@ class AppSettings(BaseSettings):
     NEKOBT_ANIME_ONLY: Optional[bool] = True
     SCRAPE_ZILEAN: Union[bool, str] = False
     ZILEAN_URL: Union[str, List[str]] = "https://zileanfortheweebs.midnightignite.me"
+    # TheRARBG — public RARBG-successor scraped natively via its GET JSON API (magnet-first,
+    # not Cloudflare-gated). Each result carries the infohash, so no .torrent fetch / no Byparr.
+    SCRAPE_THERARBG: Union[bool, str] = False
+    THERARBG_URL: Union[str, List[str]] = "https://therarbg.to"
     SCRAPE_STREMTHRU: Union[bool, str] = False
     STREMTHRU_SCRAPE_URL: Union[str, List[str]] = "https://stremthru.13377001.xyz"
     SCRAPE_DMM: Union[bool, str] = False
