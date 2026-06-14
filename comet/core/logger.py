@@ -478,6 +478,16 @@ def log_startup_info(settings):
         f"TheRARBG Scraper: {settings.format_scraper_mode(settings.SCRAPE_THERARBG)}{therarbg_url}",
     )
 
+    knaben_url = (
+        f" - {settings.KNABEN_URL}"
+        if settings.is_any_context_enabled(settings.SCRAPE_KNABEN)
+        else ""
+    )
+    logger.log(
+        "COMET",
+        f"Knaben Scraper: {settings.format_scraper_mode(settings.SCRAPE_KNABEN)}{knaben_url}",
+    )
+
     stremthru_scrape_url = (
         f" - {settings.STREMTHRU_SCRAPE_URL}"
         if settings.is_any_context_enabled(settings.SCRAPE_STREMTHRU)

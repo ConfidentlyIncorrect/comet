@@ -148,6 +148,10 @@ class AppSettings(BaseSettings):
     # not Cloudflare-gated). Each result carries the infohash, so no .torrent fetch / no Byparr.
     SCRAPE_THERARBG: Union[bool, str] = False
     THERARBG_URL: Union[str, List[str]] = "https://therarbg.to"
+    # Knaben — public torrent meta-aggregator scraped natively via its JSON API (magnet-first).
+    # Avoids the community Prowlarr def's 501 download failures (Cardigann can't POST JSON).
+    SCRAPE_KNABEN: Union[bool, str] = False
+    KNABEN_URL: Union[str, List[str]] = "https://api.knaben.org"
     SCRAPE_STREMTHRU: Union[bool, str] = False
     STREMTHRU_SCRAPE_URL: Union[str, List[str]] = "https://stremthru.13377001.xyz"
     SCRAPE_DMM: Union[bool, str] = False
