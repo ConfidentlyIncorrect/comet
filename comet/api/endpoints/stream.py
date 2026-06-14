@@ -875,7 +875,12 @@ async def stream(
                 break
 
     needs_debrid_check = (
-        total_count > 0
+        # Poll requests (?poll=1, fired every few seconds by the client's live refresh) must NOT hit
+        # the debrid availability API — that's what rate-limits the account ("too many requests").
+        # Cached availability from check_multi_service_availability above is enough; the background
+        # scrape does the live check + caches it once when it completes.
+        not poll
+        and total_count > 0
         and debrid_entries
         and (
             (not cache_result.has_cached_torrents and not use_account_scrape)
