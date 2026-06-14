@@ -89,23 +89,42 @@ services:
     volumes:
       - prowlarr_config:/config
 
-  # Solver — Byparr (FlareSolverr-API-compatible) driving a REAL anti-detect browser
-  # (nodriver/SeleniumBase) instead of plain headless Chrome, so it clears modern Cloudflare/Turnstile.
-  # Runs DIRECTLY on the VPS IP (no VPN): a VPN exit makes Cloudflare serve a harder challenge AND
-  # binds the cf_clearance cookie to a different IP than Prowlarr uses — both break the solve. The
-  # VPS's own IP only gets the normal check, which Byparr clears. (Only the actual torrent download
-  # goes through your debrid, never the VPS, so no VPN is needed here.) Prowlarr reaches it at
-  # http://flaresolverr:8191. shm_size avoids Chromium crashes.
-  flaresolverr:
-    container_name: comet-flaresolverr
+  # ── Cloudflare solver POOL ───────────────────────────────────────────────────
+  # 1337x/Uindex need a Cloudflare solve for the search AND for every .torrent download, and a single
+  # Byparr browser can't keep up — they queue and time out. So we run a POOL of Byparr workers behind
+  # an nginx load balancer. The LB keeps the name "flaresolverr" so Prowlarr's proxy URL
+  # (http://flaresolverr:8191) is unchanged; least_conn routes each challenge to the least-busy
+  # worker, so N solves run in parallel. cf_clearance cookies are valid across workers (all share the
+  # VPS IP), so round-robin is safe.
+  #
+  # Byparr workers run DIRECTLY on the VPS IP (no VPN): a VPN exit gets a harder challenge and binds
+  # cf_clearance to the wrong IP. Each worker is a full Chromium (~1-2 GB RAM); 3 ≈ 3-6 GB. Check
+  # `free -h` — drop byparr3 (and its upstream line in byparr-lb.conf) if RAM is tight, add byparr4+
+  # if you have headroom.
+  byparr1: &byparr-worker
     image: ghcr.io/thephaseless/byparr:latest
     restart: unless-stopped
     shm_size: "2gb"
-    ports:
-      - "8191:8191"
     environment:
       PORT: "8191"
       TZ: ${TZ:-Etc/UTC}
+  byparr2:
+    <<: *byparr-worker
+  byparr3:
+    <<: *byparr-worker
+
+  flaresolverr:
+    container_name: comet-flaresolverr
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - byparr1
+      - byparr2
+      - byparr3
+    ports:
+      - "8191:8191"          # Prowlarr's FlareSolverr proxy still points here (http://flaresolverr:8191)
+    volumes:
+      - ./byparr-lb.conf:/etc/nginx/conf.d/default.conf:ro
 
 volumes:
   comet_data:
