@@ -38,7 +38,7 @@ services:
       # results, because for indexers without a direct magnet (1337x etc.) Prowlarr has to fetch the
       # torrent page itself — through FlareSolverr for Cloudflare ones — which takes far longer than
       # 5s. Background scraping means this never delays opening a title.
-      GET_TORRENT_TIMEOUT: ${GET_TORRENT_TIMEOUT:-45}
+      GET_TORRENT_TIMEOUT: ${GET_TORRENT_TIMEOUT:-65}
       # Don't fetch all torrent files at once. Cloudflare indexers resolve each .torrent through
       # Byparr's single browser, so a parallel flood makes them share one timeout and nearly all fail.
       # Capping concurrency lets each batch use its full GET_TORRENT_TIMEOUT — far more survive.
