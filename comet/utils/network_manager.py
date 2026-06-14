@@ -183,6 +183,17 @@ class _RequestContextManager:
                 # Enforce a minimum delay if the server indicates 0 or very small retry-after
                 delay = max(delay, base_delay)
 
+                # If the server wants us to wait longer than we're willing to block a (foreground)
+                # scrape, abandon this request now rather than stall the whole response for minutes.
+                # A later background scrape will retry once the throttle clears.
+                max_delay = settings.RATELIMIT_RETRY_MAX_DELAY or 0
+                if max_delay > 0 and delay > max_delay:
+                    logger.warning(
+                        f"[{self.wrapper.scraper_name}] 429 Retry-After {delay}s exceeds cap "
+                        f"{max_delay}s — giving up on this request."
+                    )
+                    return self.response
+
                 logger.warning(
                     f"[{self.wrapper.scraper_name}] Received 429 Too Many Requests. Retrying in {delay}s... (Attempt {attempt + 1}/{max_retries})"
                 )

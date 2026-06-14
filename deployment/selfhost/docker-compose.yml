@@ -44,6 +44,9 @@ services:
       # Capping concurrency lets each batch use its full GET_TORRENT_TIMEOUT — far more survive.
       # Lower it (4-6) if you lean on Cloudflare indexers; raise it if yours return magnets directly.
       GET_TORRENT_CONCURRENCY: ${GET_TORRENT_CONCURRENCY:-8}
+      # If a Cloudflare indexer 429s with a long Retry-After (e.g. 60s), give up on that request
+      # instead of blocking the scrape for minutes (which makes the client time out). 0 = honor fully.
+      RATELIMIT_RETRY_MAX_DELAY: ${RATELIMIT_RETRY_MAX_DELAY:-10}
       # Re-scrape every request (Prowlarr + all scrapers) and merge new torrents onto the cache.
       ALWAYS_RESCRAPE: ${ALWAYS_RESCRAPE:-True}
       # Do that rescrape in the BACKGROUND: return cached results instantly, refresh behind the

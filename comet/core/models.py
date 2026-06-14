@@ -235,6 +235,11 @@ class AppSettings(BaseSettings):
     PROXY_ETHOS: Optional[str] = "always"
     RATELIMIT_MAX_RETRIES: Optional[int] = 3
     RATELIMIT_RETRY_BASE_DELAY: Optional[float] = 1.0
+    # If a 429 Retry-After asks us to wait longer than this many seconds, give up on that request
+    # immediately instead of blocking the (often foreground) scrape — a heavily rate-limited indexer
+    # would otherwise stall the whole response for minutes (e.g. a 60s Retry-After × retries). A later
+    # background scrape retries it once the throttle clears. 0 = no cap (honor Retry-After fully).
+    RATELIMIT_RETRY_MAX_DELAY: Optional[float] = 0
     RTN_FILTER_DEBUG: Optional[bool] = False
     FILTER_PARSE_CACHE_SIZE: Optional[int] = 10000
     FILTER_PARSE_CACHE_SHARDS: Optional[int] = 8
