@@ -77,6 +77,22 @@ class DistributedLock:
                 logger.log("LOCK", f"❌ Error acquiring lock for {self.lock_key}: {e}")
                 return False
 
+    @staticmethod
+    async def is_locked(lock_key: str) -> bool:
+        """Return True if a non-expired lock currently exists for ``lock_key``.
+
+        Read-only — does NOT acquire. Used to tell progressive clients whether a background
+        scrape for this media is still running (so they keep polling for more results).
+        """
+        try:
+            row = await database.fetch_one(
+                "SELECT 1 FROM scrape_locks WHERE lock_key = :lock_key AND expires_at >= :now LIMIT 1",
+                {"lock_key": lock_key, "now": time.time()},
+            )
+            return row is not None
+        except Exception:
+            return False
+
     async def release(self):
         if not self.acquired:
             return

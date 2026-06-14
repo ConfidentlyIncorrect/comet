@@ -255,6 +255,11 @@ def _dedupe_debrid_entries_by_service(debrid_entries: list) -> list:
     return list(unique_services.values())
 
 
+# Sentinel URL on the "still scraping" marker stream. Progressive clients (e.g. Nuvio) detect this
+# exact url, hide the row from the list, and keep polling ?poll=1 until it disappears.
+SCRAPING_MARKER_URL = "https://comet.feels.legal/scraping"
+
+
 async def background_scrape(
     torrent_manager: TorrentManager,
     media_id: str,
@@ -432,6 +437,7 @@ async def stream(
     b64config: str = None,
     chilllink: bool = False,
     kodi: bool = False,
+    poll: bool = False,
 ):
     if media_type not in ["movie", "series"]:
         return _build_stream_response(request, {"streams": []}, is_empty=True)
@@ -655,23 +661,33 @@ async def stream(
         cache_media_ids=cache_media_ids,
     )
     cache_result = await cache_manager.check_and_decide(torrent_count)
-    # ALWAYS_RESCRAPE: never serve a cache without also scraping. The cached torrents are already
-    # loaded into torrent_manager.torrents, and scrape_torrents() merges new finds on top (deduped
-    # by info_hash). Two modes (see settings):
+    # Progressive-results poll from a client (?poll=1): return the CURRENT cache as-is and never
+    # start a new scrape — otherwise the in-progress marker (added near the end) would never clear
+    # and the client would poll forever. The marker reflects whether the ORIGINAL background scrape
+    # is still running (its lock is still held).
+    #
+    # ALWAYS_RESCRAPE (non-poll): never serve a cache without also scraping. The cached torrents are
+    # already loaded into torrent_manager.torrents, and scrape_torrents() merges new finds on top
+    # (deduped by info_hash). Two modes (see settings):
     #   • background: return the cache instantly and refresh behind the request — fast opens, new
     #     results land in the cache for next time. Best when some scrapers are slow (Cloudflare via
     #     Byparr), since the open never waits on the solve.
     #   • foreground: block until the scrape finishes so cached + fresh are in the SAME response.
     # An empty cache always scrapes in the foreground (nothing to show otherwise).
     rescrape_in_background = (
-        settings.ALWAYS_RESCRAPE
+        not poll
+        and settings.ALWAYS_RESCRAPE
         and settings.ALWAYS_RESCRAPE_BACKGROUND
         and torrent_count > 0
     )
-    if rescrape_in_background:
+    if poll:
+        force_scrape_now = False
+    elif rescrape_in_background:
         force_scrape_now = False
     else:
         force_scrape_now = settings.ALWAYS_RESCRAPE or not primary_cached
+    # Whether a background scrape is (or will be) running after this response — drives the marker.
+    scrape_in_progress = False
     lock_acquired = cache_result.lock_acquired
 
     sort_mixed = is_torrent_only or config["sortCachedUncachedTogether"]
@@ -716,8 +732,10 @@ async def stream(
         )
 
     if (
-        cache_result.should_scrape_background or rescrape_in_background
-    ) and not force_scrape_now:
+        (cache_result.should_scrape_background or rescrape_in_background)
+        and not force_scrape_now
+        and not poll
+    ):
         logger.log(
             "SCRAPER",
             f"🔄 Starting background scrape for {log_title} (state={cache_result.state.value})",
@@ -730,6 +748,7 @@ async def stream(
             ip,
             session,
         )
+        scrape_in_progress = True
 
     if cache_result.should_scrape_now or force_scrape_now:
         logger.log("SCRAPER", f"🔎 Starting new search for {log_title}")
@@ -1116,9 +1135,22 @@ async def stream(
     else:
         final_streams = cached_results + non_cached_results
 
-    has_results = len(final_streams) > 0
+    # In-progress marker: tells progressive clients (Nuvio) to keep polling ?poll=1 while the
+    # background scrape for this title is still running. On a poll request we didn't schedule a
+    # scrape, so check whether the ORIGINAL one is still holding its lock — when it finishes, the
+    # marker drops and the client stops polling.
+    if poll:
+        scrape_in_progress = await DistributedLock.is_locked(media_id)
+    if scrape_in_progress:
+        final_streams.append(
+            {
+                "name": _stream_notice_name(kodi, "[⏳] Comet", "[INFO] Comet"),
+                "description": "Scraping more sources… results will keep loading.",
+                "url": SCRAPING_MARKER_URL,
+            }
+        )
 
     return _stream_response(
         {"streams": final_streams},
-        is_empty=not has_results,
+        is_empty=len(final_streams) == 0,
     )
