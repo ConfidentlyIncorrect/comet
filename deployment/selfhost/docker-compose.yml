@@ -34,6 +34,11 @@ services:
       # timeout does NOT slow down opening a title (only the very first, empty-cache open waits).
       INDEXER_MANAGER_TIMEOUT: ${INDEXER_MANAGER_TIMEOUT:-120}
       INDEXER_MANAGER_WAIT_TIMEOUT: ${INDEXER_MANAGER_WAIT_TIMEOUT:-120}
+      # Time to fetch EACH torrent/magnet from Prowlarr's /download proxy. The 5s default drops most
+      # results, because for indexers without a direct magnet (1337x etc.) Prowlarr has to fetch the
+      # torrent page itself — through FlareSolverr for Cloudflare ones — which takes far longer than
+      # 5s. Background scraping means this never delays opening a title.
+      GET_TORRENT_TIMEOUT: ${GET_TORRENT_TIMEOUT:-45}
       # Re-scrape every request (Prowlarr + all scrapers) and merge new torrents onto the cache.
       ALWAYS_RESCRAPE: ${ALWAYS_RESCRAPE:-True}
       # Do that rescrape in the BACKGROUND: return cached results instantly, refresh behind the
