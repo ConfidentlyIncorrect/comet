@@ -583,16 +583,20 @@ async def stream(
 
     # Season/series scope (Nuvio "Search Season" / "Search Whole Series" buttons send ?scope=).
     # Nulling the episode (and season) makes is_imdb_episode_request False below, which disables the
-    # single-episode reject; match_parsed_episode_target + the cache query then return pack-level
-    # results — season packs for "season", season/series packs for "series". Bypasses the per-episode
-    # renumbering filter that otherwise hides most of a #DUPE# series' torrents.
+    # single-episode reject. aggregate_scope then tells the matcher + cache query to return EVERYTHING
+    # in scope — individual episodes AND packs — for "season" (this season) or "series" (whole show).
+    # Without aggregate, episode=None means "packs only", which is ~empty for #DUPE# series like Air
+    # Disasters that are released purely as single episodes.
+    aggregate_scope = False
     if media_type == "series":
         if scope == "series":
             search_season = None
             search_episode = None
+            aggregate_scope = True
             logger.log("SCRAPER", f"🗂️  Whole-series scope for {log_title}")
         elif scope == "season":
             search_episode = None
+            aggregate_scope = True
             logger.log("SCRAPER", f"🗂️  Whole-season scope (S{season}) for {log_title}")
 
     cache_media_ids = [media_only_id]
@@ -658,6 +662,7 @@ async def stream(
         cache_media_ids=cache_media_ids,
         target_air_date=target_air_date,
         reject_unknown_episode_files=reject_unknown_episode_files,
+        aggregate_scope=aggregate_scope,
     )
 
     await torrent_manager.get_cached_torrents()

@@ -37,6 +37,7 @@ class TorrentManager:
         cache_media_ids: list[str] | None = None,
         target_air_date: str | None = None,
         reject_unknown_episode_files: bool = False,
+        aggregate_scope: bool = False,
     ):
         self.media_type = media_type
         self.media_id = media_full_id
@@ -59,6 +60,9 @@ class TorrentManager:
         )
         self.target_air_date = target_air_date
         self.reject_unknown_episode_files = reject_unknown_episode_files
+        # Season/Series scope search: aggregate ALL torrents in scope (individual episodes + packs),
+        # instead of the default episode=None "packs only" behaviour. Set by the stream endpoint.
+        self.aggregate_scope = aggregate_scope
 
         self.seen_hashes = set()
         self.torrents = {}
@@ -83,6 +87,7 @@ class TorrentManager:
             self.search_episode,
             target_air_date=self.target_air_date,
             reject_unknown_episode_files=reject_unknown,
+            aggregate=self.aggregate_scope,
         )
 
     async def scrape_torrents(
@@ -122,7 +127,10 @@ class TorrentManager:
 
     async def _fetch_cached_rows(self, media_id: str):
         where_clause, params = build_torrent_cache_where(
-            media_id, self.search_season, self.search_episode
+            media_id,
+            self.search_season,
+            self.search_episode,
+            aggregate=self.aggregate_scope,
         )
         query = (
             "SELECT info_hash, file_index, title, seeders, size, tracker, sources_json, parsed_json, episode, updated_at "

@@ -106,10 +106,21 @@ def match_parsed_episode_target(
     episode: int | None,
     target_air_date: str | None = None,
     reject_unknown_episode_files: bool = False,
+    aggregate: bool = False,
 ) -> bool:
     parsed_seasons = parsed.seasons
 
     if episode is None:
+        # Scope search (Nuvio "Search Season" / "Search Whole Series" buttons). The user wants
+        # EVERYTHING in the season/series — individual episodes AND packs — not just full-season
+        # packs. The default episode=None path below means "packs only", which returns ~nothing for
+        # shows released only as single episodes (e.g. Air Disasters). aggregate flips that: keep any
+        # torrent whose season matches (season scope) or anything at all (series scope).
+        if aggregate:
+            if season is None:
+                return True
+            return not parsed_seasons or season in parsed_seasons
+
         parsed_episodes = parsed.episodes
         if parsed_episodes and (season is None or len(parsed_episodes) == 1):
             return False
@@ -150,6 +161,7 @@ def parsed_matches_target(
     episode: int | None,
     target_air_date: str | None = None,
     reject_unknown_episode_files: bool = False,
+    aggregate: bool = False,
 ) -> bool:
     return match_parsed_episode_target(
         parsed,
@@ -157,6 +169,7 @@ def parsed_matches_target(
         episode,
         target_air_date=target_air_date,
         reject_unknown_episode_files=reject_unknown_episode_files,
+        aggregate=aggregate,
     )
 
 
