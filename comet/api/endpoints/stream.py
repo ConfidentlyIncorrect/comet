@@ -20,7 +20,7 @@ from comet.services.debrid_account_scraper import (
     ingest_account_torrents_to_public_cache, schedule_account_snapshot_refresh)
 from comet.services.lock import DistributedLock
 from comet.services.orchestration import TorrentManager
-from comet.services.trackers import trackers
+from comet.services.trackers import DEFAULT_TRACKERS, trackers
 from comet.utils.cache import (CachedJSONResponse, CachePolicies,
                                check_etag_match, generate_etag,
                                not_modified_response)
@@ -1149,7 +1149,7 @@ async def stream(
             if torrent.get("fileIndex") is not None:
                 the_stream["fileIdx"] = torrent["fileIndex"]
 
-            sources = torrent.get("sources") or trackers
+            sources = torrent.get("sources") or trackers or DEFAULT_TRACKERS
             if sources:
                 the_stream["sources"] = sources
 

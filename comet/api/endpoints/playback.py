@@ -15,6 +15,7 @@ from comet.debrid.manager import (build_account_key_hash, get_debrid,
                                   get_debrid_credentials)
 from comet.metadata.manager import MetadataScraper
 from comet.services.status_video import build_status_video_response
+from comet.services.trackers import DEFAULT_TRACKERS, trackers
 from comet.services.streaming.manager import custom_handle_stream_request
 from comet.utils.http_client import http_client_manager
 from comet.utils.network import get_client_ip
@@ -197,6 +198,14 @@ async def playback(
                 sources = orjson.loads(torrent_data["sources_json"])
             if context_media_id is None:
                 context_media_id = torrent_data["media_id"]
+
+        # Hash-only public torrents (Knaben/TheRARBG and other magnet aggregators) store no announce
+        # URLs, so the magnet would reach debrid as a bare infohash with no trackers — an UNCACHED
+        # one then can't be resolved ("unexpected provider response", torrent named by its hash).
+        # Fall back to public trackers so debrid can fetch peers + metadata. Private-tracker torrents
+        # carry their own announce URL in sources, so this never overrides them.
+        if not sources:
+            sources = trackers or DEFAULT_TRACKERS
 
         aliases = {}
         debrid_video_id = None
