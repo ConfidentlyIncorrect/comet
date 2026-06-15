@@ -200,6 +200,13 @@ def filter_worker(
                 tz_aliases.add(scrub(t))
 
     ez_aliases_normalized = list(tz_aliases)
+    # A torrent whose name CONTAINS the full title as a phrase is a match even if RTN's title_match
+    # rejects it for extra words — e.g. "Smithsonian Channel Air Disasters Series 19 ..." for the show
+    # "Air Disasters". Guarded to multi-word titles so a generic one-word title ("From", "Apex")
+    # doesn't substring-match half the catalogue.
+    scrubbed_main_title = scrub(title)
+    title_phrase_match_enabled = len(scrubbed_main_title.split()) >= 2
+
     min_year = 0
     max_year = float("inf")
 
@@ -246,9 +253,16 @@ def filter_worker(
             _log_exclusion(f"❌ Rejected (No Parsed Title) | {torrent_title}")
             continue
 
+        scrubbed_torrent_title = scrub(torrent_title)
         alias_matched = ez_aliases_normalized and quick_alias_match(
-            scrub(torrent_title), ez_aliases_normalized
+            scrubbed_torrent_title, ez_aliases_normalized
         )
+        if (
+            not alias_matched
+            and title_phrase_match_enabled
+            and scrubbed_main_title in scrubbed_torrent_title
+        ):
+            alias_matched = True
         if not alias_matched:
             if not title_match(title, parsed.parsed_title, aliases=aliases):
                 _log_exclusion(

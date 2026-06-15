@@ -114,12 +114,18 @@ class TorrentManager:
     async def scrape_torrents(
         self,
     ):
+        search_aliases = self._search_aliases()
+        if search_aliases:
+            logger.log(
+                "SCRAPER",
+                f"🔎 Also searching {len(search_aliases)} alias(es): {', '.join(search_aliases)}",
+            )
         request = ScrapeRequest(
             media_type=self.media_type,
             media_id=self.media_id,
             media_only_id=self.media_only_id,
             title=self.title,
-            aliases=self._search_aliases(),
+            aliases=search_aliases,
             year=self.year,
             year_end=self.year_end,
             season=self.search_season,
