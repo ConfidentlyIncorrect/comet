@@ -63,6 +63,14 @@ class TorrentManager:
         # Season/Series scope search: aggregate ALL torrents in scope (individual episodes + packs),
         # instead of the default episode=None "packs only" behaviour. Set by the stream endpoint.
         self.aggregate_scope = aggregate_scope
+        if aggregate_scope:
+            # Scope passes None for season/episode to mean "no constraint", but
+            # normalize_search_params above falls those Nones back to the concrete season/episode
+            # (e.g. 1/1), which silently re-narrows the search. Honour the explicit scope nulls so
+            # the matcher + cache query actually aggregate the whole season (season scope, season set
+            # + episode None) or series (series scope, both None) instead of one episode.
+            self.search_season = search_season
+            self.search_episode = search_episode
 
         self.seen_hashes = set()
         self.torrents = {}
