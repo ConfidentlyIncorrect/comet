@@ -5,7 +5,7 @@ from RTN import DefaultRanking, ParsedData
 
 from comet.core.execution import get_executor
 from comet.core.logger import logger
-from comet.core.models import CometSettingsModel, database
+from comet.core.models import CometSettingsModel, database, settings
 from comet.scrapers.manager import scraper_manager
 from comet.scrapers.models import ScrapeRequest
 from comet.services.filtering import filter_worker
@@ -90,6 +90,27 @@ class TorrentManager:
             aggregate=self.aggregate_scope,
         )
 
+    def _search_aliases(self) -> list[str]:
+        """Alternate titles for name-based scrapers to ALSO search (e.g. Air Disasters -> Mayday).
+
+        Pulls the alias "ez" bucket (canonical + TheTVDB aliases), drops the title itself and
+        duplicates, and caps the count by SEARCH_ALIAS_LIMIT to bound the extra searches.
+        """
+        limit = settings.SEARCH_ALIAS_LIMIT or 0
+        if limit <= 0:
+            return []
+        title_norm = self.title.strip().lower()
+        out, seen = [], {title_norm}
+        for alias in (self.aliases or {}).get("ez", []):
+            norm = (alias or "").strip().lower()
+            if not norm or norm in seen:
+                continue
+            seen.add(norm)
+            out.append(alias)
+            if len(out) >= limit:
+                break
+        return out
+
     async def scrape_torrents(
         self,
     ):
@@ -98,6 +119,7 @@ class TorrentManager:
             media_id=self.media_id,
             media_only_id=self.media_only_id,
             title=self.title,
+            aliases=self._search_aliases(),
             year=self.year,
             year_end=self.year_end,
             season=self.search_season,

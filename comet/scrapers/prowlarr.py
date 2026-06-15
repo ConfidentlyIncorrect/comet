@@ -119,6 +119,13 @@ class ProwlarrScraper(BaseScraper):
             queries.append(
                 f"{request.title} S{request.season:02d}E{request.episode:02d}"
             )
+        # Also search alternate/regional titles (Mayday, Air Crash Investigation, ...) so #DUPE#
+        # shows whose torrents use a different name get pulled in. Base query only: an alias's own
+        # season/episode numbering usually differs from the canonical one, so a bare-title search is
+        # the reliable way to surface them; the result filter + episode matcher sort them out after.
+        for alias in request.aliases:
+            if alias:
+                queries.append(alias)
 
         try:
             tasks = []

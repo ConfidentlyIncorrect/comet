@@ -245,6 +245,12 @@ class AppSettings(BaseSettings):
     # background scrape retries it once the throttle clears. 0 = no cap (honor Retry-After fully).
     RATELIMIT_RETRY_MAX_DELAY: Optional[float] = 0
     RTN_FILTER_DEBUG: Optional[bool] = False
+    # How many alternate/regional titles (alias "ez" bucket) the name-based scrapers also search,
+    # on top of the canonical title. Essential for #DUPE# shows whose torrents use a different name
+    # (e.g. "Air Disasters" → "Mayday" / "Air Crash Investigation"). Each alias is an extra search
+    # per name-based scraper (cheap for the magnet APIs; for Prowlarr it reuses the cf_clearance
+    # cookie after the first solve), so this caps the blow-up. 0 disables alias searching.
+    SEARCH_ALIAS_LIMIT: Optional[int] = 3
     FILTER_PARSE_CACHE_SIZE: Optional[int] = 10000
     FILTER_PARSE_CACHE_SHARDS: Optional[int] = 8
     FILTER_PARSE_CACHE_DEDUP_INFLIGHT: Optional[bool] = True

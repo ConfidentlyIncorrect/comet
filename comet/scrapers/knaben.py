@@ -17,45 +17,54 @@ class KnabenScraper(BaseScraper):
 
     async def scrape(self, request: ScrapeRequest):
         torrents = []
-        try:
-            body = {
-                "search_type": "score",
-                "search_field": "title",
-                "query": request.title,
-                "order_by": "seeders",
-                "order_direction": "desc",
-                "from": 0,
-                "size": 300,
-                "hide_unsafe": True,
-                "hide_xxx": False,
-            }
-            response = await self.session.post(f"{self.url.rstrip('/')}/v1", json=body)
-            data = await response.json()
-
-            hits = data.get("hits", []) if isinstance(data, dict) else []
-            for result in hits:
-                info_hash = (result.get("hash") or "").strip().lower()
-                if len(info_hash) not in (40, 32):
-                    continue
-
-                size = result.get("bytes")
-                seeders = result.get("seeders")
-                sub_tracker = result.get("tracker") or "Knaben"
-
-                torrents.append(
-                    {
-                        "title": result.get("title"),
-                        "infoHash": info_hash,
-                        "fileIndex": None,
-                        "seeders": int(seeders) if seeders is not None else None,
-                        "size": int(size) if size is not None else None,
-                        "tracker": f"Knaben | {sub_tracker}",
-                        "sources": [],
-                    }
+        seen_hashes = set()
+        # Search the canonical title AND any alternate/regional titles (Mayday, Air Crash
+        # Investigation, ...) so #DUPE# shows whose torrents use a different name get pulled in.
+        for query in [request.title, *request.aliases]:
+            if not query:
+                continue
+            try:
+                body = {
+                    "search_type": "score",
+                    "search_field": "title",
+                    "query": query,
+                    "order_by": "seeders",
+                    "order_direction": "desc",
+                    "from": 0,
+                    "size": 300,
+                    "hide_unsafe": True,
+                    "hide_xxx": False,
+                }
+                response = await self.session.post(
+                    f"{self.url.rstrip('/')}/v1", json=body
                 )
-        except Exception as e:
-            logger.warning(
-                f"Exception while getting torrents for {request.title} with Knaben ({self.url}): {e}"
-            )
+                data = await response.json()
+
+                hits = data.get("hits", []) if isinstance(data, dict) else []
+                for result in hits:
+                    info_hash = (result.get("hash") or "").strip().lower()
+                    if len(info_hash) not in (40, 32) or info_hash in seen_hashes:
+                        continue
+                    seen_hashes.add(info_hash)
+
+                    size = result.get("bytes")
+                    seeders = result.get("seeders")
+                    sub_tracker = result.get("tracker") or "Knaben"
+
+                    torrents.append(
+                        {
+                            "title": result.get("title"),
+                            "infoHash": info_hash,
+                            "fileIndex": None,
+                            "seeders": int(seeders) if seeders is not None else None,
+                            "size": int(size) if size is not None else None,
+                            "tracker": f"Knaben | {sub_tracker}",
+                            "sources": [],
+                        }
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Exception while getting torrents for {query} with Knaben ({self.url}): {e}"
+                )
 
         return torrents
