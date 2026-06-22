@@ -8,6 +8,10 @@
 
 <p align="center"><img src="https://socialify.git.ci/g0ldyy/comet/image?description=1&font=Inter&forks=1&language=1&name=1&owner=1&pattern=Solid&stargazers=1&theme=Dark" /></p>
 
+> 🛠️ **Customized fork — `ConfidentlyIncorrect/comet`, branch `tvdb-dupe-fix` (currently paused).** Carries scope-aware (episode/season/series) search, alias/`#DUPE#` title matching, and tracker fallbacks for niche content. Currently **paused** in favor of [AIOStreams](https://github.com/ConfidentlyIncorrect/AIOStreams/tree/custom) for aggregation; its Prowlarr instance still backs the stack.
+>
+> Part of the ecosystem: **[NuvioTV](https://github.com/ConfidentlyIncorrect/NuvioTV/tree/custom)** (Android TV client) · **[AIOStreams](https://github.com/ConfidentlyIncorrect/AIOStreams/tree/custom)** (on-demand aggregator) · **[usa-tv-next](https://github.com/ConfidentlyIncorrect/usa-tv-next)** (live US TV). Everything below is upstream documentation.
+
 # Features
 - **CometNet**: Decentralized P2P network for automatic torrent metadata sharing ([documentation](docs/cometnet/README.md))
 - **Kodi Support**: Dedicated official add-on with automatic updates ([documentation](kodi/README.md))
